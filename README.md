@@ -5,7 +5,7 @@ Easy access to relevant images and information of any solar flare the past 12 ye
 
 ## Purpose
 
-A solar flare display that easily accesses data and images using a common programming language. Most scientists use IDL— a more expensive method— to get solar data.
+A free solar flare display. Most scientists use IDL— a more expensive method— to view solar flares.
 
 *PLEASE WAIT 15-20 SECONDS. THERE SHOULD BE 3 VIDEOS APPEARING BELOW*
 ![page1](https://user-images.githubusercontent.com/100271213/183282760-9c4211a5-a795-45d3-9bab-3f54a295ea9a.gif)

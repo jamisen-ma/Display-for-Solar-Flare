@@ -12,6 +12,13 @@ A free solar flare display. Most scientists use IDLâ€” a more expensive methodâ€
 ![page2](https://user-images.githubusercontent.com/100271213/183282807-a2605831-83a0-426b-be25-714270332dbe.gif)
 ![page3](https://user-images.githubusercontent.com/100271213/183282840-e1ad0e9d-ca34-4c5d-a4fc-00198797982c.gif)
 
+## Frameworks/Libaries Used
+ - OpenCV
+ - PyTorch
+ - Pandas
+ - Numpy
+ - Matplotlib
+
 ## Control Panel
 <img width="1398" alt="Screen Shot 2022-08-07 at 1 46 24 AM" src="https://user-images.githubusercontent.com/100271213/183282874-e1bcabf3-d62f-4333-a5bc-43ac83e1f39a.png">
 

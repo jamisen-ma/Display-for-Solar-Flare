@@ -15,6 +15,9 @@ A free solar flare display. Most scientists use IDLâ€” a more expensive methodâ€
 ## Frameworks/Libaries Used
  - OpenCV
  - PyTorch
+ - SciPy
+ - SunPy
+ - Astropy
  - Pandas
  - Numpy
  - Matplotlib

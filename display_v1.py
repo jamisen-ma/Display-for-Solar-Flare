@@ -61,6 +61,36 @@ import requests
 import pandas as pd
 import time as lmao
 
+# Centralized logging and shared utilities
+from logging_setup import get_logger
+from image_processing_functions import (
+    strided_rescale as _strided_rescale,
+    mask_saturation as _mask_saturation,
+)
+from math_time_functions import (
+    to_datetime_object as _to_datetime_object,
+    convert_timedelta as _convert_timedelta,
+)
+from creating_image_lists_functions import (
+    create_date_list as _create_date_list,
+)
+from get_online_files import (
+    get_image_urls as _get_image_urls,
+)
+from units_conversion_functions import (
+    x_helioprojective_to_pixel as _x_hp_to_px,
+    y_helioprojective_to_pixel as _y_hp_to_px,
+    x_pixel_to_helioprojective as _x_px_to_hp,
+    y_pixel_to_helioprojective as _y_px_to_hp,
+    rhessi_pixel_to_helioprojective_x as _r_px_to_hp_x,
+    rhessi_pixel_to_helioprojective_y as _r_px_to_hp_y,
+    rhessi_x_helioprojective_to_pixel as _r_hp_to_px_x,
+    rhessi_y_helioprojective_to_pixel as _r_hp_to_px_y,
+    helioprojective_to_heliographic as _hp_to_hg,
+)
+
+logger = get_logger(__name__)
+
 space = 155
 
 style.use("seaborn-bright")
@@ -209,10 +239,7 @@ def create_frame():
 
 
 def strided_rescale(g, bin_fac):
-    strided = as_strided(g,
-                         shape=(g.shape[0] // bin_fac, g.shape[1] // bin_fac, bin_fac, bin_fac),
-                         strides=((g.strides[0] * bin_fac, g.strides[1] * bin_fac) + g.strides))
-    return strided.mean(axis=-1).mean(axis=-1)  # order is NOT important! See notes..
+    return _strided_rescale(g, bin_fac)
 
 
 create_frame()
@@ -235,99 +262,59 @@ def rounddown(x):
 
 
 def x_helioprojective_to_pixel(value, additional_value):
-    return ((value + additional_value) / pixel_arcsec_x_list_placeholder[0]) + sun_center_x_list_placeholder[0]
+    return _x_hp_to_px(value, additional_value, pixel_arcsec_x_list_placeholder, sun_center_x_list_placeholder)
 
 
 def y_helioprojective_to_pixel(value, additional_value):
-    return ((-value + additional_value) / pixel_arcsec_y_list_placeholder[0]) + sun_center_y_list_placeholder[0]
+    return _y_hp_to_px(value, additional_value, pixel_arcsec_y_list_placeholder, sun_center_y_list_placeholder)
 
 
 def x_pixel_to_helioprojective(value):
-    return (value - sun_center_x_list_placeholder[0]) * pixel_arcsec_x_list_placeholder[0]
+    return _x_px_to_hp(value, sun_center_x_list_placeholder, pixel_arcsec_x_list_placeholder)
 
 
 def y_pixel_to_helioprojective(value):
-    return -(value - sun_center_y_list_placeholder[0]) * pixel_arcsec_y_list_placeholder[0]
+    return _y_px_to_hp(value, sun_center_y_list_placeholder, pixel_arcsec_y_list_placeholder)
 
 
 def rhessi_pixel_to_helioprojective_x(header_center, value, multiplier):
-    return (value - header_center) * multiplier
+    return _r_px_to_hp_x(header_center, value, multiplier)
 
 
 def rhessi_pixel_to_helioprojective_y(header_center, value, multiplier):
-    return -(value - header_center) * multiplier
+    return _r_px_to_hp_y(header_center, value, multiplier)
 
 
 def rhessi_x_helioprojective_to_pixel(header_center, value, multiplier, additional_value):
-    return ((value + additional_value) / multiplier) + header_center
+    return _r_hp_to_px_x(header_center, value, multiplier, additional_value)
 
 
 def rhessi_y_helioprojective_to_pixel(header_center, value, multiplier, additional_value):
-    return ((-value + additional_value) / multiplier) + header_center
+    return _r_hp_to_px_y(header_center, value, multiplier, additional_value)
 
 
 def x_helioprojective_to_pixel(value, additional_value):
-    return ((value + additional_value) / pixel_arcsec_x_list_placeholder[0]) + sun_center_x_list_placeholder[0]
+    return _x_hp_to_px(value, additional_value, pixel_arcsec_x_list_placeholder, sun_center_x_list_placeholder)
 
 
 def y_helioprojective_to_pixel(value, additional_value):
-    return ((-value + additional_value) / pixel_arcsec_y_list_placeholder[0]) + sun_center_y_list_placeholder[0]
+    return _y_hp_to_px(value, additional_value, pixel_arcsec_y_list_placeholder, sun_center_y_list_placeholder)
 
 
 def x_pixel_to_helioprojective(value):
-    print("helio values")
-    print(sun_center_x_list_placeholder[0], pixel_arcsec_x_list_placeholder[0])
-    return (value - sun_center_x_list_placeholder[0]) * pixel_arcsec_x_list_placeholder[0]
+    return _x_px_to_hp(value, sun_center_x_list_placeholder, pixel_arcsec_x_list_placeholder)
 
 
 def y_pixel_to_helioprojective(value):
-    return -(value - sun_center_y_list_placeholder[0]) * pixel_arcsec_y_list_placeholder[0]
+    return _y_px_to_hp(value, sun_center_y_list_placeholder, pixel_arcsec_y_list_placeholder)
 
 
 def helioprojective_to_heliographic(x, y, time):
-    c = SkyCoord(x * u.arcsec, y * u.arcsec, frame=frames.Helioprojective, obstime=time, observer="earth")
-
-    heliographic_coord = (c.transform_to(frames.HeliographicStonyhurst))
-
-    # North and South is latitude
-    # West and East is longitude
-
-    NS_lat = int(re.sub(r'[a-z]+', '', str(heliographic_coord.lat)[:3], re.I))
-    EW_lon = int(re.sub(r'[a-z]+', '', str(heliographic_coord.lon)[:3], re.I))
-
-    if NS_lat > 0:
-        first_part = "N" + str(NS_lat)
-    else:
-        first_part = "S" + str(abs(NS_lat))
-
-    if EW_lon > 0:
-        second_part = "W" + str(EW_lon)
-    else:
-        second_part = "E" + str(abs(EW_lon))
-    return first_part + second_part
+    return _hp_to_hg(x, y, time)
 
 
 def helioprojective_to_heliographic(x, y, time):
-    c = SkyCoord(x * u.arcsec, y * u.arcsec, frame=frames.Helioprojective, obstime=time, observer="earth")
-
-    heliographic_coord = (c.transform_to(frames.HeliographicStonyhurst))
-
-    # North and South is latitude
-    # West and East is longitude
-
-    NS_lat = int(re.sub(r'[a-z]+', '', str(heliographic_coord.lat)[:3], re.I))
-    EW_lon = int(re.sub(r'[a-z]+', '', str(heliographic_coord.lon)[:3], re.I))
-
-    if NS_lat > 0:
-        first_part = "N" + str(NS_lat)
-    else:
-        first_part = "S" + str(abs(NS_lat))
-
-    if EW_lon > 0:
-        second_part = "W" + str(EW_lon)
-    else:
-        second_part = "E" + str(abs(EW_lon))
-    return first_part + second_part
+    return _hp_to_hg(x, y, time)
 
 
 def find_files(url):
@@ -342,75 +329,26 @@ def find_files(url):
 
 
 def get_image_urls(dates_list):
-    file_path_list = []
-    for date1 in dates_list:
-        date1 = date1.replace("-", "/")
-        url = "https://hesperia.gsfc.nasa.gov/hessidata/metadata/qlook_image/{}/".format(date1)
-
-        list_of_links = find_files(url)
-
-        for link in list_of_links:
-            if "fsimg" in str(link):
-                str_link = str(link)
-
-                file_path_list.append(
-                    "https://hesperia.gsfc.nasa.gov/hessidata/metadata/qlook_image/{}/{}".format(date1, str(link)))
-    return file_path_list
+    return _get_image_urls(dates_list)
 
 
 def create_date_list(sdate, edate):
-    print("fdsfdsfdsf")
-    sdate = date(int(sdate[:4]), int(sdate[5:7]), int(sdate[8:10]))  # start date
-    edate = date(int(edate[:4]), int(edate[5:7]), int(edate[8:10]))  # end date
-
-    delta = edate - sdate
-    date_list = []
-
-    for i in range(delta.days):
-        day = sdate + timedelta(days=i)
-
-        date_list.append(str(day))
-        date_list.append(str(day))
-    return date_list
+    return _create_date_list(sdate, edate)
 
 
 def to_datetime_object(date_string, date_format):
-    s = datetime.strptime(str(date_string), date_format)
-    return s
+    return _to_datetime_object(date_string, date_format)
 
 
 def convert_timedelta(duration):
-    seconds = duration.seconds
-    minutes = ((seconds % 3600) // 60) + 1
-    return minutes
+    return _convert_timedelta(duration)
 
 
 import numpy as np
 
 
 def mask_saturation(rast, nodata=-9999):
-    '''
-    Masks out saturated values (surface reflectances of 16000). Arguments:
-        rast    A gdal.Dataset or NumPy array
-        nodata  The NoData value; defaults to -9999.
-    '''
-    # Can accept either a gdal.Dataset or numpy.array instance
-    if not isinstance(rast, np.ndarray):
-        rast = rast.ReadAsArray()
-
-    # Create a baseline "nothing is saturated in any band" raster
-    mask = np.empty((1, rast.shape[1], rast.shape[2]))
-    mask.fill(False)
-
-    # Update the mask for saturation in any band
-    for i in range(rast.shape[0]):
-        np.logical_or(mask,
-                      np.in1d(rast[i, ...].ravel(), (16000,)).reshape(rast[i, ...].shape),
-                      out=mask)
-
-    # Repeat the NoData value across the bands
-    np.place(rast, mask.repeat(rast.shape[0], axis=0), (nodata,))
-    return rast
+    return _mask_saturation(rast, nodata)
 
 
 def selected_RHESSI_keys(flare_list, selected_start_date, selected_end_date):

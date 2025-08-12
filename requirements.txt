@@ -1,0 +1,16 @@
+numpy
+pandas
+scipy
+matplotlib
+astropy
+sunpy
+reproject
+drms
+PyQt5
+pyqtgraph
+opencv-python
+Pillow
+requests
+beautifulsoup4
+lxml
+

@@ -1,21 +1,28 @@
+from __future__ import annotations
+
+import csv
+import copy
+import os
+import subprocess
+import sys
+import threading
+from typing import List
+
 import pandas as pd
-from flare_csv import Ui_MainWindow
 import pyqtgraph as pg
-from PyQt5.QtGui import *
-from PyQt5.QtCore import *
 import pyqtgraph.ptime as ptime
 from PyQt5 import QtCore, QtWidgets, QtGui
-# importing Qt widgets
-from PyQt5.QtWidgets import *
-import csv
-import sys
-import subprocess
-import os
-import copy
-import threading
-from subprocess import call
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *  # noqa: F401,F403 - used by Qt model setup below
 
-class MainWindow():
+from flare_display import Ui_MainWindow
+from logging_setup import get_logger
+
+logger = get_logger(__name__)
+
+
+class MainWindow:
 
     def __init__(self):
 
@@ -39,11 +46,14 @@ class MainWindow():
         #self.flare_table.cellClicked.connect(self.cell_was_clicked)
         self.flare_table.setSortingEnabled(True)
         self.flare_table.clicked.connect(self.cell_was_clicked)
-        self.ui.update_data_button.clicked.connect(self.update_data)
-        self.ui.run_auto_data_collection_button.clicked.connect(self.run_auto_data_collection)
+        # Optional buttons may not exist on this UI; guard connections.
+        if hasattr(self.ui, 'update_data_button'):
+            self.ui.update_data_button.clicked.connect(self.update_data)
+        if hasattr(self.ui, 'run_auto_data_collection_button'):
+            self.ui.run_auto_data_collection_button.clicked.connect(self.run_auto_data_collection)
 
     def run_auto_data_collection(self):
-        processThread = threading.Thread(target=self.thread_auto_data_collection)  # <- note extra ','
+        processThread = threading.Thread(target=self.thread_auto_data_collection)
         processThread.start()
 
     def are_checkboxes_checked(self, list1):
@@ -57,7 +67,7 @@ class MainWindow():
 
     def update_download(self):
         data_index_list = list(pd.read_csv('flare_pickle_links.csv', index_col='index').index)
-        print(data_index_list)
+        logger.info("Updating download state for %d entries", len(data_index_list))
         for num in data_index_list:
             self.checkbox_list[num].setCheckState(QtCore.Qt.Checked)
         list2 = range(0, 15171)
@@ -74,7 +84,7 @@ class MainWindow():
 
     def cell_was_clicked(self):
         index = (self.flare_table.selectionModel().currentIndex().row())+1
-        print(index)
+        logger.debug("Row clicked: %s", index)
         self.index = index
         self.get_metadata()
 
@@ -91,13 +101,13 @@ class MainWindow():
 
     def show(self):
         self.main_window.show()
-        print()
+        logger.debug("Main window shown")
 
     def thread_auto_data_collection(self):
-        call(["python", "automatic_data_collection.py"])
+        subprocess.call([sys.executable, "automatic_data_collection.py"])  # nosec B603
 
     def thread_second(self):
-        call(["python", "flare_display.py"])
+        subprocess.call([sys.executable, "flare_display.py"])  # nosec B603
 
     def run_widget(self):
         event_peak_time1 = self.flare_metadata['GOES Peak Time']
@@ -106,8 +116,8 @@ class MainWindow():
         flare_links = pd.read_csv('flare_pickle_links.csv')['filename'].to_list()
         if not file_name in flare_links:
             pd.to_pickle(dict(self.flare_metadata), 'current_flare_info.pickle')
-            print(self.flare_metadata)
-            os.system('python data_collection.py')
+        logger.info("Running data collection for selected flare")
+        subprocess.call([sys.executable, 'data_collection.py'])  # nosec B603
             flare_pickle_links_dataframe = pd.read_csv('flare_pickle_links.csv', index_col='index')
             flare_pickle_links_dataframe.loc[self.index] = file_name
             flare_pickle_links_dataframe.to_csv('flare_pickle_links.csv')

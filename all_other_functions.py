@@ -1,27 +1,26 @@
+from __future__ import annotations
+
 import bisect
+from typing import List, Sequence
+
 from PyQt5 import QtCore
 
-def normalized_plot(plot_list):
-    new_list = []
-    max_value = max(plot_list)
-    for intensity in plot_list:
-        new_val = intensity / max_value
-        new_list.append(new_val)
-    return new_list
+from logging_setup import get_logger
 
 
-def selected_RHESSI_keys(flare_list, selected_start_date, selected_end_date):
+logger = get_logger(__name__)
+
+
+def normalized_plot(plot_list: Sequence[float]) -> List[float]:
+    max_value = max(plot_list) if plot_list else 1.0
+    return [float(intensity) / max_value for intensity in plot_list]
+
+
+def selected_RHESSI_keys(flare_list: Sequence[str], selected_start_date: str, selected_end_date: str) -> List[str]:
     left_index = bisect.bisect(flare_list, selected_start_date) - 1
-
     right_index = bisect.bisect(flare_list, selected_end_date)
-
-    selected_solar_flares_keys_list = flare_list[left_index:right_index]
-
-    return selected_solar_flares_keys_list
+    return list(flare_list[left_index:right_index])
 
 
 def clickBox(self, state):
-    if state == QtCore.Qt.Checked:
-        print('Checked')
-    else:
-        print('Unchecked')
+    logger.debug('Checkbox state: %s', 'Checked' if state == QtCore.Qt.Checked else 'Unchecked')

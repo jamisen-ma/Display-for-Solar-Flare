@@ -1,15 +1,34 @@
-import pandas as pd
+from __future__ import annotations
+
+import bisect
 from datetime import timedelta
 import numpy as np
-import bisect
-from units_conversion_functions import *
-from math_time_functions import *
+import pandas as pd
+
+from logging_setup import get_logger
+from units_conversion_functions import (
+    x_helioprojective_to_pixel as _x_hp_to_px,
+    y_helioprojective_to_pixel as _y_hp_to_px,
+    x_pixel_to_helioprojective as _x_px_to_hp,
+    y_pixel_to_helioprojective as _y_px_to_hp,
+    rhessi_pixel_to_helioprojective_x as _r_px_to_hp_x,
+    rhessi_pixel_to_helioprojective_y as _r_px_to_hp_y,
+    rhessi_x_helioprojective_to_pixel as _r_hp_to_px_x,
+    rhessi_y_helioprojective_to_pixel as _r_hp_to_px_y,
+)
+from math_time_functions import to_datetime_object
 from manipulate_flare_lists_functions import frame_sort_func, split_frames, take_closest
 from HMI_data_analysis import get_HMI_data, get_pixel_coords_from_AR_center
 from PyQt_shapes import RectItem, EclipseItem
 from image_processing_functions import strided_rescale
-from creating_image_lists_functions import creating_1600_image_list, create_difference_and_ratio_lists, create_date_list
+from creating_image_lists_functions import (
+    creating_1600_image_list,
+    create_difference_and_ratio_lists,
+    create_date_list,
+)
 from get_online_files import get_image_urls
+
+logger = get_logger(__name__)
 
 smaller_solar_dict = {}
 
@@ -47,7 +66,7 @@ solar_flares_panda_frame['real.peak.date'] = np.where(
 
 solar_flares_panda_frame['real_start_time'] = solar_flares_panda_frame['real.start.date'].dt.strftime(
     '%Y-%m-%d') + " " + solar_flares_panda_frame['start_time_placeholder']
-print("finsiehedddd")
+    logger.debug("Finished computing real/peak/end time columns")
 solar_flares_panda_frame['real_peak_time'] = solar_flares_panda_frame['real.peak.date'].dt.strftime(
     '%Y-%m-%d') + " " + solar_flares_panda_frame['peak_placeholder']
 
@@ -91,17 +110,14 @@ flag_list = ['a0', 'a1', 'a2', 'a3', 'A0', 'A1', 'A2', 'A3', 'DF', 'DR', 'ED', '
 solar_flares_panda_frame = solar_flares_panda_frame.drop(
     ['real.start.date', 'real.end.date', 'real.peak.date', 'radial', 'start.date', 'peak', 'end', 'start.time'],
     axis=1)
-print("Start time list")
-# solar_flares_panda_frame = solar_flares_panda_frame.drop(solar_flares_panda_frame.index[range(32,116143)])
-print(solar_flares_panda_frame.index)
-print(start_time_list)
+logger.info("Preparing flag columns and time lists")
 converted_to_string_start_time_list = []
 
 for date2 in start_time_list:
     # date2 = datetime.strptime(str(date2), '%Y-%m-%d %H:%M:%S')
     date2 = str(date2)
     converted_to_string_start_time_list.append(date2)
-print(converted_to_string_start_time_list)
+    logger.debug("Converted start times: %d entries", len(converted_to_string_start_time_list))
 # solar_flares_panda_frame['GOES Start Time'] = [1,2,3,4,5,6,7]
 for flag in flag_list:
     make_new_column_func(flag, 'flags', solar_flares_panda_frame)
@@ -112,8 +128,7 @@ solar_flares_dict = solar_flares_panda_frame.set_index("peak_time").T.to_dict('d
 def selected_RHESSI_keys(flare_list, selected_start_date, selected_end_date):
     left_index = bisect.bisect(flare_list, selected_start_date)
     right_index = bisect.bisect(flare_list, selected_end_date)
-    print("numbers")
-    print(left_index, right_index)
+    logger.debug("Selected RHESSI keys slice: %s-%s", left_index, right_index)
     selected_solar_flares_keys_list = flare_list[left_index:right_index]
 
     return selected_solar_flares_keys_list
@@ -127,18 +142,16 @@ for i in range(0, len(solar_flares_time_list)):
     flare_info = solar_flares_dict[solar_flares_time_list[i]]
     smaller_solar_dict[solar_flares_time_list[i]] = flare_info
 
-print("smaller_solar_dict")
-print(solar_flares_time_list)
+logger.info("Solar flares time list prepared: %d items", len(solar_flares_time_list))
 
 
 # ________
 
 def match_RHESSI_image_with_RHESSI_list(flare_list, urls):
-    print("urls")
-    print(urls)
+    logger.info("Matching RHESSI images for %d URLs", len(urls))
     for y in range(0, len(urls)):
 
-        print(y)
+        logger.debug("Processing URL index %s", y)
 
         headers = fits.open(urls[y])[0].header
 
@@ -147,8 +160,7 @@ def match_RHESSI_image_with_RHESSI_list(flare_list, urls):
         flare_index = bisect.bisect_left(flare_list, peak_time)
 
         peak_time = to_datetime_object(str(peak_time)[:-4], date_format2)
-        print(peak_time)
-        print(flare_index)
+        logger.debug("Peak time %s at flare index %s", peak_time, flare_index)
 
         try:
             if abs(to_datetime_object(flare_list[flare_index], date_format2) - peak_time) > abs(
@@ -161,7 +173,7 @@ def match_RHESSI_image_with_RHESSI_list(flare_list, urls):
             continue
 
         # image_data = fits.getdata(urls[y], ext=0)
-        print("image received")
+        logger.debug("Image header received")
         rhessi_header_x = headers['CRPIX1']
         rhessi_header_y = headers['CRPIX1']
 
@@ -170,19 +182,14 @@ def match_RHESSI_image_with_RHESSI_list(flare_list, urls):
         smaller_solar_dict[flare_dict_key]['rhessi_conversion'] = headers['CDELT1']
         # smaller_solar_dict[flare_dict_key]['image_data'] = image_data
         smaller_solar_dict[flare_dict_key]['rhessi_image_link'] = urls[y]
-        print("flare dict key")
-        print(flare_dict_key)
+        logger.debug("Matched flare key %s", flare_dict_key)
 
 
 match_RHESSI_image_with_RHESSI_list(solar_flares_time_list, url_list)
 solar_flares_datetime_object_time_list = [to_datetime_object(date_val, '%Y-%m-%d %H:%M:%S') for date_val in
                                           solar_flares_time_list]
 
-print("dictssss")
-print(solar_flares_datetime_object_time_list)
-print(real_peak_time_list)
-print("real time list")
-print(real_start_time_list)
+logger.info("Correlating %d RHESSI times to GOES times", len(real_peak_time_list))
 for i in range(0, len(real_peak_time_list)):
     flare_index = bisect.bisect(solar_flares_datetime_object_time_list, real_peak_time_list[i])
 
@@ -196,11 +203,11 @@ for i in range(0, len(real_peak_time_list)):
             master_dict[str(real_peak_time_list[i])]['GOES Start Time'] = real_start_time_list[i]
             master_dict[str(real_peak_time_list[i])]['GOES Peak Time'] = real_peak_time_list[i]
             master_dict[str(real_peak_time_list[i])]['GOES End Time'] = real_end_time_list[i]
-            print("success")
+            logger.debug("Correlation success at index %s (prev)", i)
 
         elif abs(solar_flares_datetime_object_time_list[flare_index] - real_peak_time_list[i]) < timedelta(
                 minutes=20):
-            print("success1")
+            logger.debug("Correlation success at index %s (curr)", i)
             data = smaller_solar_dict[solar_flares_time_list[flare_index]]
             master_dict[str(real_peak_time_list[i])] = data
             master_dict[str(real_peak_time_list[i])]['flare.class'] = real_flare_class_list[i]
@@ -210,7 +217,7 @@ for i in range(0, len(real_peak_time_list)):
 
     except IndexError:
         pass
-print("master dict 2")
+logger.info("Master dict assembled, writing DataFrame")
 
 new_dataframe = pd.DataFrame(master_dict).transpose()
 drop_list = ['flare', 'flags', 'a0', 'a1', 'a2', 'a3',
@@ -220,13 +227,10 @@ drop_list = ['flare', 'flags', 'a0', 'a1', 'a2', 'a3',
 
 for element in drop_list:
     new_dataframe.drop(element, axis=1, inplace=True)
-print(new_dataframe)
-print(new_dataframe.index)
-print(new_dataframe.columns)
+logger.debug("New dataframe shape: %s x %s", *new_dataframe.shape)
 flare_class1 = new_dataframe['flare.class']
 new_dataframe.drop(labels=['flare.class'], axis=1, inplace=True)
 new_dataframe.insert(3, 'Flare Class', flare_class1)
 pd.to_pickle(new_dataframe, 'dataframetest.pickle')
 
-print('real peak time list')
-print(real_peak_time_list)
+logger.info("Completed create_flare_master_list pipeline")
